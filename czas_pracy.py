@@ -6,15 +6,24 @@ import datetime
 import threading
 import requests
 import sys
+import pystray
+from PIL import Image
 
 #zrobić przerwę po 8h pracy
+#sterowanie z traya
 
 class CzasPracy():
     def __init__(self):
         root.geometry("384x410")
         root.title("Kontrola czasu pracy")
+        root.protocol("WM_DELETE_WINDOW", lambda: self.minimalizuj_do_traya())
+        root.attributes('-toolwindow', True)
+        self.ikona_play = Image.open("ready.png")
+        self.ikona_pauza = Image.open("pause.png")
+        self.menu = (
+            pystray.MenuItem('Pokaż', self.pokaz_okno, default=True),
+            )
         czcionka = ('times',22,'bold')
-        root.protocol("WM_DELETE_WINDOW", lambda: self.wyjscie_z_programu())
         self.lbl_aktualny_czas_tekst=tk.Label(root,font=czcionka, text="Aktualny czas:")
         self.lbl_aktualny_czas_tekst.grid(row=0,column=0,padx=5,pady=5,sticky="W")
         self.lbl_aktualny_czas=tk.Label(root,font=czcionka)
@@ -45,7 +54,9 @@ class CzasPracy():
         self.lbl_czas_do_przerwy.grid(row=6,column=1,padx=5,pady=5)
         
         self.btn_wstrzymaj_czas_pracy = tk.Button(root,text='WSTRZYMAJ PRACĘ', width=15, command=lambda: self.pauza_wznowienie_pracy())
-        self.btn_wstrzymaj_czas_pracy.grid(row=7,column=0,ipadx=5,ipady=5,sticky="E",pady=15)
+        self.btn_wstrzymaj_czas_pracy.grid(row=7,column=0,ipadx=5,ipady=5,pady=15)
+        self.btn_WITHDRAW = tk.Button(root,text='ZAMKNIJ PROGRAM', width=15, command=lambda: self.wyjscie_z_programu())
+        self.btn_WITHDRAW.grid(row=7,column=1,ipadx=5,ipady=5,pady=15)
         #funkcja inicjalizująca
         self.start_pracy()
 
@@ -86,6 +97,7 @@ class CzasPracy():
         watek_co_sekunde_zawsze = threading.Thread(target=self.co_sekunde_zawsze)
         watek_co_sekunde_zawsze.start()
 
+
     def co_sekunde_zawsze(self):
         self.lbl_aktualny_czas.config(text=time.strftime('%H:%M:%S'))
         if self.licz_czas_pracy:
@@ -99,7 +111,6 @@ class CzasPracy():
             self.koniec_pracy = (datetime.datetime.now()+self.pozostalo_pracy).strftime('%H:%M:%S')
         else:
             self.koniec_pracy = '-'
-
         self.lbl_koniec_pracy.config(text=str(self.koniec_pracy))
         self.lbl_czas_przerwy.config(text=str(datetime.timedelta(seconds=self.czas_trwania_przerwy)))
         self.lbl_czas_do_przerwy.config(text=str(datetime.timedelta(hours=1)-datetime.timedelta(seconds=self.czas_od_ostatniej_przerwy)))
@@ -142,22 +153,25 @@ class CzasPracy():
 
     def pauza_wznowienie_pracy(self):
         #pauza czasu pracy
-        if self.licz_czas_pracy:
-            root.configure(background='gold2')
-            self.licz_czas_pracy = False
-            self.licz_czas_od_ostatniej_przerwy = False
-            self.licz_czas_przerwy = True
-            self.czas_od_ostatniej_przerwy = 0
-            self.btn_wstrzymaj_czas_pracy.config(text='WZNÓW PRACĘ')
-        #wznowienie czasu pracy
-        else:
-            root.configure(background='#F0F0F0')
-            self.licz_czas_pracy = True
-            self.licz_czas_od_ostatniej_przerwy = True
-            self.licz_czas_przerwy = False
-            self.czas_od_ostatniej_przerwy = 0
-            self.czas_trwania_przerwy = 0
-            self.btn_wstrzymaj_czas_pracy.config(text='WSTRZYMAJ PRACĘ')
+        if self.licz_czas_pracy: self.pauza_czasu_pracy()
+        else: self.wznowienie_czasu_pracy()
+            
+    def pauza_czasu_pracy(self):
+        root.configure(background='gold2')
+        self.licz_czas_pracy = False
+        self.licz_czas_od_ostatniej_przerwy = False
+        self.licz_czas_przerwy = True
+        self.czas_od_ostatniej_przerwy = 0
+        self.btn_wstrzymaj_czas_pracy.config(text='WZNÓW PRACĘ')
+
+    def wznowienie_czasu_pracy(self):
+        root.configure(background='#F0F0F0')
+        self.licz_czas_pracy = True
+        self.licz_czas_od_ostatniej_przerwy = True
+        self.licz_czas_przerwy = False
+        self.czas_od_ostatniej_przerwy = 0
+        self.czas_trwania_przerwy = 0
+        self.btn_wstrzymaj_czas_pracy.config(text='WSTRZYMAJ PRACĘ')
     
     def wyslij_wiadomosc_na_telegram(self):
         self.wiadomosc = "Czas wracać do pracy! Skończysz o " + str(self.koniec_pracy)
@@ -170,10 +184,45 @@ class CzasPracy():
         czas_pracy_odczytany_podzielony = ostatnia_linia_odczytana.split(";")
         lines[-1] = czas_pracy_odczytany_podzielony[0] + ";" + czas_pracy_odczytany_podzielony[1] + ";" + str(self.sekund_pracy_dzis)+ ";" + str(self.wykorzystana_dluga_przerwa)
         open("dane.txt", 'w').writelines(lines)
+        self.icon.stop()
         root.destroy()
         sys.exit()  
 
+    def pokaz_okno(self):
+        self.icon.stop()
+        root.deiconify()
 
+    def minimalizuj_do_traya(self):
+        root.withdraw()
+        if self.licz_czas_pracy:
+            '''self.menu = (
+            pystray.MenuItem('Wstrzymaj pracę', self.pauza_z_traya),
+            pystray.MenuItem('Pokaż okno', self.pokaz_okno, default=True),
+            )'''
+            self.icon = pystray.Icon("name", self.ikona_play, "Czas pracy aktywny", self.menu)
+            thread = threading.Thread(daemon=True, target=lambda: self.icon.run())
+            thread.start()
+        else:
+            '''self.menu = (
+            pystray.MenuItem('Wznów pracę', self.start_z_traya),
+            pystray.MenuItem('Pokaż okno', self.pokaz_okno, default=True),
+            )'''
+            self.icon = pystray.Icon("name", self.ikona_pauza, "Czas pracy wstrzymany", self.menu)
+            thread = threading.Thread(daemon=True, target=lambda: self.icon.run())
+            thread.start()
+        #self.icon.run()
+       
+
+    '''def start_z_traya(self):
+        self.pokaz_okno()
+        self.wznowienie_czasu_pracy()
+        self.minimalizuj_do_traya()
+
+    def pauza_z_traya(self):
+        self.pokaz_okno()
+        self.pauza_czasu_pracy()
+        self.minimalizuj_do_traya()
+    '''
 if __name__ == "__main__":
     TOKEN = "5816344668:AAGgs9IK0iAiWG603pwetbOSdCPxL6zsia8"
     CHAT_ID = "5526684558"
