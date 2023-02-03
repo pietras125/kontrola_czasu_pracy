@@ -71,7 +71,7 @@ class CzasPracy():
             for line in file_read:
                 linia_tekstu = line.split(";")
                 data = linia_tekstu[0]
-                if data == datetime.datetime.now().strftime('%Y-%d-%m'):
+                if data == datetime.datetime.now().strftime('%Y-%m-%d'):
                     self.uruchomienie_dzisiaj = True
                     self.stempel_czasowy_startu_pracy = datetime.datetime.strptime(linia_tekstu[1],'%H:%M:%S')
                     self.sekund_pracy_dzis = int(linia_tekstu[2])
@@ -81,8 +81,8 @@ class CzasPracy():
         if not self.uruchomienie_dzisiaj:
             self.stempel_czasowy_startu_pracy = datetime.datetime.now()
             self.sekund_pracy_dzis = 0
-            with open('dane.txt', 'w') as file_write:
-                file_write.write(datetime.datetime.now().strftime('%Y-%d-%m') + ";" + str(self.stempel_czasowy_startu_pracy.strftime('%H:%M:%S')) + ";" + str(self.sekund_pracy_dzis) + ";" + str(self.wykorzystana_dluga_przerwa))
+            with open('dane.txt', 'a') as file_write:
+                file_write.write("\n" + datetime.datetime.now().strftime('%Y-%m-%d') + ";" + str(self.stempel_czasowy_startu_pracy.strftime('%H:%M:%S')) + ";" + str(self.sekund_pracy_dzis) + ";" + str(self.wykorzystana_dluga_przerwa))
         #czy była praca czy nie to zresetuj poniższe flagi
         self.lbl_czas_startu_pracy.config(text=self.stempel_czasowy_startu_pracy.strftime('%H:%M:%S'))
         self.czas_od_ostatniej_przerwy = 0
@@ -184,7 +184,6 @@ class CzasPracy():
         czas_pracy_odczytany_podzielony = ostatnia_linia_odczytana.split(";")
         lines[-1] = czas_pracy_odczytany_podzielony[0] + ";" + czas_pracy_odczytany_podzielony[1] + ";" + str(self.sekund_pracy_dzis)+ ";" + str(self.wykorzystana_dluga_przerwa)
         open("dane.txt", 'w').writelines(lines)
-        self.icon.stop()
         root.destroy()
         sys.exit()  
 
