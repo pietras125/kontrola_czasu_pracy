@@ -17,7 +17,7 @@ class CzasPracy():
         root.geometry("384x410")
         root.title("Kontrola czasu pracy")
         root.protocol("WM_DELETE_WINDOW", lambda: self.minimalizuj_do_traya())
-        root.attributes('-toolwindow', True)
+        #root.attributes('-toolwindow', True)
         self.ikona_play = Image.open("ready.png")
         self.ikona_pauza = Image.open("pause.png")
         self.menu = (
@@ -65,6 +65,7 @@ class CzasPracy():
         self.uruchomienie_dzisiaj = False
         self.wykorzystana_dluga_przerwa = False
         self.czy_pracuje_dluzej = False
+        self.sekund_od_ostatniego_zapisu = 0
         self.pozostalo_pracy = datetime.timedelta(seconds=1) #potrzebne do pokazania 00:00:00 jak kończy się praca w komórce "pozostało pracy"
         #sprawdzenie czy już dzisiaj byla praca, jesli tak to odczytaj dane
         with open("dane.txt") as file_read:
@@ -76,16 +77,17 @@ class CzasPracy():
                     self.stempel_czasowy_startu_pracy = datetime.datetime.strptime(linia_tekstu[1],'%H:%M:%S')
                     self.sekund_pracy_dzis = int(linia_tekstu[2])
                     if linia_tekstu[3] == "True": self.wykorzystana_dluga_przerwa = True
+                    self.czas_od_ostatniej_przerwy = int(linia_tekstu[4])
                     break                
         #jeśli nie było dzisiaj pracy to wyzeruj wszystkie potrzebne statusy
         if not self.uruchomienie_dzisiaj:
             self.stempel_czasowy_startu_pracy = datetime.datetime.now()
             self.sekund_pracy_dzis = 0
+            self.czas_od_ostatniej_przerwy = 0
             with open('dane.txt', 'a') as file_write:
                 file_write.write("\n" + datetime.datetime.now().strftime('%Y-%m-%d') + ";" + str(self.stempel_czasowy_startu_pracy.strftime('%H:%M:%S')) + ";" + str(self.sekund_pracy_dzis) + ";" + str(self.wykorzystana_dluga_przerwa))
         #czy była praca czy nie to zresetuj poniższe flagi
         self.lbl_czas_startu_pracy.config(text=self.stempel_czasowy_startu_pracy.strftime('%H:%M:%S'))
-        self.czas_od_ostatniej_przerwy = 0
         self.licz_czas_od_ostatniej_przerwy = True
         self.czas_trwania_przerwy = 0
         self.licz_czas_przerwy = False
@@ -97,23 +99,36 @@ class CzasPracy():
         watek_co_sekunde_zawsze = threading.Thread(target=self.co_sekunde_zawsze)
         watek_co_sekunde_zawsze.start()
 
-
     def co_sekunde_zawsze(self):
+        #wyświetlenie bieżącego czasu
         self.lbl_aktualny_czas.config(text=time.strftime('%H:%M:%S'))
+        #dodawanie sekundy do czasu pracy jeśli jest liczony
         if self.licz_czas_pracy:
             self.sekund_pracy_dzis += 1
             self.lbl_aktualny_czas_pracy.config(text=str(datetime.timedelta(seconds=self.sekund_pracy_dzis)))
+            #wyświetlenie ile czasu zostało
             if self.pozostalo_pracy.total_seconds() >= 1: self.pozostalo_pracy = datetime.timedelta(hours=8)-datetime.timedelta(seconds = self.sekund_pracy_dzis)
             self.lbl_pozostalo_pracy.config(text=str(self.pozostalo_pracy))
+            #liczenie czasu od ostatniej skończonej przerwy
             if self.licz_czas_od_ostatniej_przerwy: self.czas_od_ostatniej_przerwy += 1
+        #jeśli trwa przerwa to licz jej czas
         if self.licz_czas_przerwy: self.czas_trwania_przerwy +=1
+        #wyzerowanie licznika czasu pozostałej pracy, jeśli pracuję ponad 8h 
         if not self.czy_pracuje_dluzej and self.pozostalo_pracy.total_seconds() > 0: 
             self.koniec_pracy = (datetime.datetime.now()+self.pozostalo_pracy).strftime('%H:%M:%S')
         else:
             self.koniec_pracy = '-'
+        #zapis do pliku co minutę
+        if self.sekund_od_ostatniego_zapisu == 60:
+            self.sekund_od_ostatniego_zapisu = 0
+            self.zapis_do_pliku()
+        else:
+            self.sekund_od_ostatniego_zapisu += 1
+        #wyświetlenie danych
         self.lbl_koniec_pracy.config(text=str(self.koniec_pracy))
         self.lbl_czas_przerwy.config(text=str(datetime.timedelta(seconds=self.czas_trwania_przerwy)))
         self.lbl_czas_do_przerwy.config(text=str(datetime.timedelta(hours=1)-datetime.timedelta(seconds=self.czas_od_ostatniej_przerwy)))
+        #uruchomienie tej funckji za równą minutę (w pętli root.mainloop)
         self.lbl_aktualny_czas.after(1000,self.co_sekunde_zawsze)
     
     def co_sekunde(self):
@@ -124,6 +139,7 @@ class CzasPracy():
             self.przerwa_dluzsza = False
             self.wyslij_wiadomosc_na_telegram()
             messagebox.showwarning("PRZERWA", "Czas wracać do pracy!")
+            #dopiero po wciśnięciu przycisku w messageboxie startuje czas pracy
             self.przerwa_dluzsza = False
             self.licz_czas_pracy = True
             self.licz_czas_od_ostatniej_przerwy = True
@@ -179,13 +195,16 @@ class CzasPracy():
         print(requests.get(self.url).json())
 
     def wyjscie_z_programu(self):
+        self.zapis_do_pliku()
+        root.destroy()
+        sys.exit()  
+
+    def zapis_do_pliku(self):
         lines = open("dane.txt", 'r').readlines()
         ostatnia_linia_odczytana = lines[-1].rstrip()
         czas_pracy_odczytany_podzielony = ostatnia_linia_odczytana.split(";")
-        lines[-1] = czas_pracy_odczytany_podzielony[0] + ";" + czas_pracy_odczytany_podzielony[1] + ";" + str(self.sekund_pracy_dzis)+ ";" + str(self.wykorzystana_dluga_przerwa)
+        lines[-1] = czas_pracy_odczytany_podzielony[0] + ";" + czas_pracy_odczytany_podzielony[1] + ";" + str(self.sekund_pracy_dzis)+ ";" + str(self.wykorzystana_dluga_przerwa) + ";" + str(self.czas_od_ostatniej_przerwy)
         open("dane.txt", 'w').writelines(lines)
-        root.destroy()
-        sys.exit()  
 
     def pokaz_okno(self):
         self.icon.stop()
@@ -222,6 +241,7 @@ class CzasPracy():
         self.pauza_czasu_pracy()
         self.minimalizuj_do_traya()
     '''
+    
 if __name__ == "__main__":
     TOKEN = "5816344668:AAGgs9IK0iAiWG603pwetbOSdCPxL6zsia8"
     CHAT_ID = "5526684558"
