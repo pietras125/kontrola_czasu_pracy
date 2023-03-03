@@ -1,5 +1,4 @@
-import tkinter  as tk 
-from tkinter import ttk
+import tkinter  as tk
 from tkinter import messagebox
 import time
 import datetime
@@ -15,6 +14,7 @@ from PIL import Image
 class CzasPracy():
     def __init__(self):
         root.geometry("384x410")
+        root.call('wm', 'attributes', '.', '-topmost', '1')
         root.title("Kontrola czasu pracy")
         root.protocol("WM_DELETE_WINDOW", lambda: self.minimalizuj_do_traya())
         #root.attributes('-toolwindow', True)
@@ -135,12 +135,11 @@ class CzasPracy():
         #sprawdź czy trzeba wrócić do pracy
         if self.licz_czas_pracy and ((self.czas_trwania_przerwy == 15*60 and self.przerwa_dluzsza) or (self.czas_trwania_przerwy == 5*60 and not self.przerwa_dluzsza)):
             #wstrzymuj czas pracy jeżeli przedłużasz przerwę
-            self.licz_czas_pracy = False
+            #self.licz_czas_pracy = False - #dopiero po wciśnięciu przycisku w messageboxie startuje czas pracy - TUTAJ SIĘ WŁĄCZA
             self.przerwa_dluzsza = False
             self.wyslij_wiadomosc_na_telegram()
-            messagebox.showwarning("PRZERWA", "Czas wracać do pracy!")
-            #dopiero po wciśnięciu przycisku w messageboxie startuje czas pracy
-            self.przerwa_dluzsza = False
+            messagebox.showwarning("PRZERWA", "Czas wracać do pracy!", parent=root)
+            #dopiero po wciśnięciu przycisku w messageboxie startuje czas pracy - WYŁĄCZONE
             self.licz_czas_pracy = True
             self.licz_czas_od_ostatniej_przerwy = True
             self.licz_czas_przerwy = False
@@ -149,10 +148,10 @@ class CzasPracy():
         #sprawdź czy trzeba zrobić przerwę
         if self.czas_od_ostatniej_przerwy == 60*60 and self.sekund_pracy_dzis < 28800:
             if not self.wykorzystana_dluga_przerwa:
-                self.przerwa_dluzsza = messagebox.askyesno("PRZERWA", "Zrób przerwę! Czy to ma być długa przerwa?")
+                self.przerwa_dluzsza = messagebox.askyesno("PRZERWA", "Zrób przerwę! Czy to ma być długa przerwa?", parent=root)
                 if self.przerwa_dluzsza: self.wykorzystana_dluga_przerwa = True
             else:
-                messagebox.showwarning("PRZERWA", "Zrób przerwę!")
+                messagebox.showwarning("PRZERWA", "Zrób przerwę!", parent=root)
             self.licz_czas_od_ostatniej_przerwy = False
             self.licz_czas_przerwy = True
             self.czas_od_ostatniej_przerwy = 0
@@ -160,7 +159,7 @@ class CzasPracy():
         #sprawdź czy skończyła się praca
         if self.licz_czas_pracy and self.sekund_pracy_dzis >= 28800 and not self.czy_pracuje_dluzej:
             self.koniec_pracy = '-'
-            self.czy_konczysz_prace = messagebox.askyesno("KONIEC PRACY", "Czas kończyć pracę. Czy kończysz?")
+            self.czy_konczysz_prace = messagebox.askyesno("KONIEC PRACY", "Czas kończyć pracę. Czy kończysz?", parent=root)
             if self.czy_konczysz_prace: 
                 self.wyjscie_z_programu()
             else:
