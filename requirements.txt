@@ -1,0 +1,10 @@
+# Wymagane biblioteki dla aplikacji Czas Pracy
+tkinter
+pystray
+Pillow
+requests
+pyinstaller
+
+# Opcjonalne biblioteki dla autostartu
+winshell
+pywin32
